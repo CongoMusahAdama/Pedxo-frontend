@@ -165,12 +165,15 @@ const router = createBrowserRouter([
 ])
 
 function App() {
-    return (
-  <QueryClientProvider client={queryClient}>
-    <UserProvider>
-      <RouterProvider router={router} />
-    </UserProvider>
-  </QueryClientProvider>
-);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <UserProvider>
+        <RouterProvider router={router} />
+      </UserProvider>
+    </QueryClientProvider>
+  );
+}
+
+export default App;
 
 export default App
