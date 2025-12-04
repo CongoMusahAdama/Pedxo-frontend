@@ -10,7 +10,7 @@ import usePersonalInfoContract from '../../features/contracts/usePersonalInfoCon
 import CustomForm from '../../ui/CustomForm'
 import CustomInput from '../../ui/CustomInput'
 
-const FormOne = ({ nextStep, savedState, contractType }) => {
+const FormOne = ({ nextStep, savedState, contractType, username, userId }) => {
   const { countries, isLoading } = useGetCountries()
   const [hasChanges, setHasChanges] = useState(false)
 
