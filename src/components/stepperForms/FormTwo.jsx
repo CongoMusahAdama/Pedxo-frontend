@@ -1,133 +1,118 @@
-import { Switch } from 'antd';
-import { useState, useEffect } from 'react';
-import Dropdown from '../../Dropdown.json';
-import { useFormik } from 'formik';
-import * as Yup from 'yup';
-import CustomForm from '../../ui/CustomForm';
-import CustomSelect from '../../ui/CustomSelect';
-import Button from '../Button';
-import useJobDetailsForm from '../../features/contracts/useJobDetailsForm';
-import { useSearchParams } from 'react-router-dom';
-import { formatISO } from 'date-fns';
+import { Switch } from 'antd'
+import { useState, useEffect } from 'react'
+import Dropdown from '../../Dropdown.json'
+import { useFormik } from 'formik'
+import * as Yup from 'yup'
+import CustomForm from '../../ui/CustomForm'
+import CustomSelect from '../../ui/CustomSelect'
+import Button from '../Button'
+import useJobDetailsForm from '../../features/contracts/useJobDetailsForm'
+import { useSearchParams } from 'react-router-dom'
+import { formatISO } from 'date-fns'
 
-const FormTwo = ({ nextStep, savedState, username, userId }) => {
-  const [searchParams] = useSearchParams();
-  const contractType = searchParams.get('contractType') || null;
-  const { updateForm, sendingForm } = useJobDetailsForm();
-  const today = new Date().toISOString().split('T')[0];
-
-  const [showSwitch, setShowSwitch] = useState(Boolean(savedState?.endDate) || false);
-  const [settingTemplate, setSettingTemplate] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
+const FormTwo = ({ nextStep, savedState, username, userId, contractSessionId }) => {
+  const [searchParams] = useSearchParams()
+  const contractType = searchParams.get('contractType') || null
+  const { updateForm, sendingForm } = useJobDetailsForm()
+  const today = new Date().toISOString().split('T')[0]
+  const [showSwitch, setShowSwitch] = useState(
+    Boolean(savedState.endDate) || false
+  )
+  const [settingTemplate, setSettingTemplate] = useState(false)
+  const [hasChanges, setHasChanges] = useState(false)
 
   const validationSchema = Yup.object({
-    roleTitle: contractType === 'gig-based'
-      ? Yup.string().required('Role title is required')
-      : Yup.string().notRequired(),
-    seniorityLevel: Yup.string().notRequired(),
-    scopeOfWork: Yup.string().notRequired(),
+    roleTitle: Yup.string().notRequired(''),
+    seniorityLevel: Yup.string().notRequired(''),
+    scopeOfWork: Yup.string().notRequired(''),
     startDate: Yup.string().required('Start Date is required'),
-    endDate: contractType === 'gig-based'
-      ? Yup.string().required('End Date is required')
-      : Yup.string().notRequired(),
-    explanationOfScopeOfWork: Yup.string().notRequired(),
-  });
+    endDate: Yup.string().notRequired(''),
+    explanationOfScopeOfWork: Yup.string().notRequired(''),
+  })
 
   const initialValues = {
-    roleTitle: savedState?.roleTitle || '',
-    seniorityLevel: savedState?.seniorityLevel || '',
-    scopeOfWork: savedState?.scopeOfWork || '',
-    startDate: savedState?.startDate
+    roleTitle: savedState.roleTitle || '',
+    seniorityLevel: savedState.seniorityLevel || '',
+    scopeOfWork: savedState.scopeOfWork || '',
+    startDate: savedState.startDate
       ? formatISO(new Date(savedState.startDate), { representation: 'date' })
       : '',
-    endDate: savedState?.endDate
-      ? formatISO(new Date(savedState.endDate), { representation: 'date' })
+    endDate: savedState.endDate
+      ? formatISO(new Date(savedState?.endDate), { representation: 'date' })
       : '',
-    explanationOfScopeOfWork: savedState?.explanationOfScopeOfWork || '',
-  };
+    explanationOfScopeOfWork: savedState.explanationOfScopeOfWork || '',
+  }
 
   const formik = useFormik({
     validationSchema,
     initialValues,
     enableReinitialize: true,
     onSubmit: (values, { setSubmitting }) => {
-      const mergedData = {
-        ...(JSON.parse(localStorage.getItem(`${username}_personalInfo`)) || {}),
-        ...values,
-      };
-
-      // Save to localStorage immediately
-      localStorage.setItem(`${username}_personalInfo`, JSON.stringify(mergedData));
-      console.log("[FORM2] Saved to localStorage:", mergedData);
-
       if (!hasChanges) {
-        nextStep();
-        setSubmitting(false);
-        return;
+        nextStep()
+        setSubmitting(false)
+        return
       }
 
       const payload = {
         ...values,
-        userId, //  Include userId for backend filtering
-      };
+        userId,
+        contractSessionId,
+      }
 
       updateForm(payload, {
-        onSuccess: (data) => {
-          // Merge any data returned from backend
-          if (data?.data) {
-            const backendUpdated = {
-              ...mergedData,
-              ...data.data,
-            };
-            localStorage.setItem(`${username}_personalInfo`, JSON.stringify(backendUpdated));
-            console.log("[FORM2] Updated from backend response:", backendUpdated);
-          }
-          nextStep();
+        onSuccess: () => {
+          nextStep()
         },
         onSettled: () => {
-          setSubmitting(false);
+          setSubmitting(false)
         },
-      });
+      })
     },
-  });
+  })
 
+  // Check for changes between current values and initial values
   useEffect(() => {
     const changesDetected = Object.keys(initialValues).some(
       (key) => formik.values[key] !== initialValues[key]
-    );
-    setHasChanges(changesDetected);
-  }, [formik.values, initialValues]);
+    )
+    setHasChanges(changesDetected)
+  }, [formik.values, initialValues])
 
   const handleSow = (e) => {
-    formik.setFieldValue('scopeOfWork', e.target.value);
-    handleSetTemplate(e.target.value);
-  };
+    formik.setFieldValue('scopeOfWork', e.target.value)
+    handleSetTemplate(e.target.value)
+  }
 
   const handleSetTemplate = (name) => {
-    if (!name) return;
-    setSettingTemplate(true);
-    const selected = Dropdown.scopeOfWork.explanation.find((el) => el.title === name);
+    if (!name) return
+    setSettingTemplate(true)
+    const selected = Dropdown.scopeOfWork.explanation.find(
+      (el) => el.title === name
+    )
     if (selected) {
       const responsibilitiesText = selected.responsibilities
         .map((item) => `- ${item}`)
-        .join('\n');
-      formik.setFieldValue('explanationOfScopeOfWork', responsibilitiesText);
+        .join('\n')
+      formik.setFieldValue('explanationOfScopeOfWork', responsibilitiesText)
     }
-    setSettingTemplate(false);
-  };
+    setSettingTemplate(false)
+  }
 
   return (
     <div className='flex flex-col gap-4'>
       <div className='space-y-1'>
         <h1 className='text-lg font-semibold leading-normal'>Role Details</h1>
-        <div className='text-sm font-medium leading-normal text-gray-500'>
+        <div
+          className='text-sm font-medium leading-normal'
+          style={{ color: 'rgba(0, 0, 0, 0.50)' }}
+        >
           {contractType === 'full-time' ? 'Full Time Role' : 'Gig Based Role'}
         </div>
       </div>
-
       <CustomForm onSubmit={formik.handleSubmit}>
         <CustomSelect
-          label={`Role Title${contractType === 'gig-based' ? ' *' : ''}`}
+          label='Role Title'
           name='roleTitle'
           onBlur={formik.handleBlur}
           value={formik.values.roleTitle}
@@ -142,7 +127,7 @@ const FormTwo = ({ nextStep, savedState, username, userId }) => {
           onBlur={formik.handleBlur}
           value={formik.values.seniorityLevel}
           onChange={formik.handleChange}
-          placeholder='Select seniority level...'
+          placeholder='Select seniority level..'
           options={Dropdown.seniorityLevels}
         />
 
@@ -151,17 +136,23 @@ const FormTwo = ({ nextStep, savedState, username, userId }) => {
           name='scopeOfWork'
           onBlur={formik.handleBlur}
           onChange={handleSow}
-          value={settingTemplate ? 'Setting template...' : formik.values.scopeOfWork}
-          placeholder={settingTemplate ? 'Setting Template...' : 'Choose template...'}
+          value={
+            settingTemplate ? 'Setting template...' : formik.values.scopeOfWork
+          }
+          placeholder={
+            settingTemplate ? 'Setting Template... ' : 'Choose template..'
+          }
           disabled={settingTemplate}
           options={Dropdown.scopeOfWork.options}
         />
 
-        {/* Start Date */}
         <div className='relative flex flex-col gap-1 w-full md:gap-3'>
           <div className='flex justify-between'>
-            <label htmlFor='startDate' className='text-sm font-semibold leading-normal'>
-              Start Date<span className='text-red-500'>*</span>
+            <label
+              htmlFor='startDate'
+              className='text-sm font-semibold leading-normal'
+            >
+              Start Date <span className='text-red-500'>*</span>
             </label>
           </div>
           <input
@@ -173,20 +164,24 @@ const FormTwo = ({ nextStep, savedState, username, userId }) => {
             value={formik.values.startDate}
             onChange={formik.handleChange}
             min={today}
-            className='w-full bg-transparent border outline-gray-400 rounded-lg p-3 text-sm'
-            style={{ borderColor: 'rgba(0, 0, 0, 0.20)' }}
+            className={`w-full bg-transparent border outline-gray-400 rounded-lg p-3 text-sm`}
+            style={{
+              borderColor: 'rgba(0, 0, 0, 0.20)',
+            }}
           />
         </div>
 
-        {/* End Date */}
         <div className='relative flex flex-col gap-1 md:gap-3 w-full text-sm'>
           <div className='flex justify-between'>
             <label
               htmlFor='endDate'
-              className={`font-semibold leading-normal ${!showSwitch && 'opacity-40'}`}
+              className={`font-semibold leading-normal
+                ${!showSwitch && 'opacity-40'}
+              `}
             >
               End Date
             </label>
+
             {contractType === 'full-time' && (
               <Switch
                 size='small'
@@ -204,14 +199,19 @@ const FormTwo = ({ nextStep, savedState, username, userId }) => {
             onChange={formik.handleChange}
             onClick={(e) => e.target.showPicker()}
             min={formik.values.startDate}
-            className='w-full disabled:opacity-50 bg-transparent border outline-gray-400 rounded-lg p-4'
-            style={{ borderColor: 'rgba(0, 0, 0, 0.20)' }}
+            className={`w-full disabled:opacity-50 bg-transparent border outline-gray-400 rounded-lg p-4
+            `}
+            style={{
+              borderColor: 'rgba(0, 0, 0, 0.20)',
+            }}
           />
         </div>
 
-        {/* Scope Explanation */}
         <div className='flex flex-col gap-1 w-full md:gap-3 text-sm'>
-          <label htmlFor='scope of work' className='font-semibold leading-normal'>
+          <label
+            htmlFor='scope of work'
+            className='font-semibold leading-normal'
+          >
             Scope of explanation and tech stack requirements
           </label>
           <textarea
@@ -221,15 +221,10 @@ const FormTwo = ({ nextStep, savedState, username, userId }) => {
             rows='7'
             value={formik.values.explanationOfScopeOfWork}
             onChange={formik.handleChange}
-            className='bg-transparent border outline-gray-400 rounded-lg px-4 py-2 caret-black font-medium focus:ring-2 focus:ring-blue-500'
+            className='bg-transparent border outline-gray-400 rounded-lg px-4 py-2'
             style={{ borderColor: 'rgba(0, 0, 0, 0.20)' }}
           ></textarea>
-          <p className='text-xs text-gray-500 italic mt-1'>
-            You can edit the generated scope of work. Just click and start typing.
-          </p>
         </div>
-
-        {/* Submit Button */}
         <div>
           <Button
             isLoading={formik.isSubmitting || sendingForm}
@@ -243,7 +238,7 @@ const FormTwo = ({ nextStep, savedState, username, userId }) => {
         </div>
       </CustomForm>
     </div>
-  );
-};
+  )
+}
 
-export default FormTwo;
+export default FormTwo

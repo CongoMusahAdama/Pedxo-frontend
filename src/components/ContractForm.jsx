@@ -1,78 +1,63 @@
-import { useState, useEffect, useCallback } from 'react';
-import './Stepper.css';
-import FormOne from './stepperForms/FormOne';
-import FormTwo from './stepperForms/FormTwo';
-import FormThree from './stepperForms/FormThree';
-import FormFour from './stepperForms/FormFour';
-import FormFive from './stepperForms/FormFive';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useGlobalContext } from '../Context';
-import { useUser } from '../context/UserContext';
-import { FaArrowLeft } from 'react-icons/fa';
-import { useFormik } from 'formik';
-import * as Yup from 'yup';
-import toast from 'react-hot-toast';
+import { useState, useEffect, useCallback } from 'react'
+import './Stepper.css'
+import FormOne from './stepperForms/FormOne'
+import FormTwo from './stepperForms/FormTwo'
+import FormThree from './stepperForms/FormThree'
+import FormFour from './stepperForms/FormFour'
+import FormFive from './stepperForms/FormFive'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useGlobalContext } from '../Context'
+import { FaArrowLeft } from 'react-icons/fa'
+import { useFormik } from 'formik'
+import * as Yup from 'yup'
+import toast from 'react-hot-toast'
 
 const ContractForm = ({ subHead, endDate }) => {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const contractType = searchParams.get('contractType');
-  const { setFormStepperData } = useGlobalContext();
-  const { user } = useUser();
+  const data = sessionStorage.getItem('currentStep')
+  const savedStep = JSON.parse(data)
+  const [currentStep, setCurrentStep] = useState(savedStep || 1)
+  const [searchParams] = useSearchParams('')
+  const contractType = searchParams.get('contractType')
 
-  // Generate or retrieve username
-  const authUserId = user?.id || user?._id;
-  const existingUsername = sessionStorage.getItem('username');
-  const username = existingUsername || (authUserId ? `contract_${authUserId}` : generateTempUsername());
+  const navigate = useNavigate()
+  const { setFormStepperData } = useGlobalContext()
 
-  useEffect(() => {
-    if (!existingUsername) {
-      sessionStorage.setItem('username', username);
-    }
-  }, [existingUsername, username]);
-
-  function generateTempUsername() {
-    const temp = `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    sessionStorage.setItem('username', temp);
-    return temp;
-  }
-
-  // Get userId from auth context or fallback
-  const storedUserId = sessionStorage.getItem('userId');
-  const userId = authUserId || storedUserId || generateTempUserId();
-
-  useEffect(() => {
-    if (authUserId && authUserId !== storedUserId) {
-      sessionStorage.setItem('userId', authUserId);
-    }
-  }, [authUserId, storedUserId]);
-
-  function generateTempUserId() {
-    const id = `uid_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    sessionStorage.setItem('userId', id);
-    return id;
-  }
-
-  // Step management
-  const savedStep = JSON.parse(sessionStorage.getItem(`${username}_currentStep`));
-  const [currentStep, setCurrentStep] = useState(savedStep || 1);
-
+  // Get completion count from sessionStorage or initialize to 0
   const getCompletionCount = () => {
-    const count = sessionStorage.getItem(`${username}_contractCompletionCount`);
-    return count ? parseInt(count) : 0;
-  };
-  const [completionCount, setCompletionCount] = useState(getCompletionCount());
+    const count = sessionStorage.getItem('contractCompletionCount')
+    return count ? parseInt(count) : 0
+  }
+
+  const [completionCount, setCompletionCount] = useState(getCompletionCount())
+
+  // Generate unique contract session ID for this submission
+  const getOrCreateContractSessionId = () => {
+    const existingSessionId = sessionStorage.getItem('contractSessionId')
+
+    // If session ID exists and we're still in the form (not completed), reuse it
+    if (existingSessionId && currentStep <= 4) {
+      return existingSessionId
+    }
+
+    // Generate new session ID for new contract submission
+    const newSessionId = `contract_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    sessionStorage.setItem('contractSessionId', newSessionId)
+    console.log('[CONTRACT_SESSION] Generated new contractSessionId:', newSessionId)
+    return newSessionId
+  }
+
+  const contractSessionId = getOrCreateContractSessionId()
 
   const handleOptionSelect = (option) => {
-    setFormStepperData(option);
-  };
+    setFormStepperData(option)
+  }
 
   const steps = [
     'Personal Information',
     'Job Details',
     'Compensation Budget',
     'Review Contract',
-  ];
+  ]
 
   const initialValues = {
     clientName: '',
@@ -80,7 +65,7 @@ const ContractForm = ({ subHead, endDate }) => {
     country: '',
     state: '',
     companyName: '',
-    roleTitle: '',
+    roleTitle: '', //Optional
     seniorityLevel: '',
     scopeOfWork: '',
     description: '',
@@ -89,16 +74,32 @@ const ContractForm = ({ subHead, endDate }) => {
     paymentRate: '',
     paymentFrequency: '',
     signature: '',
-  };
+  }
 
   const handlePrevious = useCallback(() => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-      sessionStorage.setItem(`${username}_currentStep`, JSON.stringify(currentStep - 1));
-    } else {
-      navigate('/dashboard/add-developer');
+    if (currentStep > 1) setCurrentStep(currentStep - 1)
+    else {
+      navigate('/dashboard/add-developer')
     }
-  }, [currentStep, navigate, username]);
+  }, [currentStep, navigate])
+
+  useEffect(() => {
+    window.history.pushState({ step: currentStep }, '')
+  }, [currentStep])
+
+  // Handle browser back button
+  useEffect(() => {
+    const handlePopState = (e) => {
+      if (e.state && e.state.step) {
+        setCurrentStep(e.state.step)
+      } else {
+        navigate('/add-developer')
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [navigate])
 
   const validationSchema = Yup.object({
     scopeOfWork: Yup.string().required('Scope of work is required'),
@@ -106,29 +107,26 @@ const ContractForm = ({ subHead, endDate }) => {
     description: Yup.string().required('Scope of work explanation is required'),
     paymentRate: Yup.number().required('Payment rate is required'),
     paymentFrequency: Yup.string().required('Payment frequency is required'),
-  });
+  })
 
   const formik = useFormik({
     initialValues,
     enableReinitialize: true,
     validationSchema,
-    onSubmit: (values, { setSubmitting }) => {
-      toast.success('Application sent Successfully');
+    onSubmit: (values, { setSubmitting, resetForm }) => {
+      toast.success('Application sent Successfully')
     },
-  });
+  })
 
-  // Load saved form data dynamically based on current step
-  const [savedState, setSavedState] = useState(null);
-  useEffect(() => {
-    const contract = localStorage.getItem(`${username}_personalInfo`);
-    setSavedState(contract ? JSON.parse(contract) : null);
-  }, [currentStep, username]);
+  const contract = sessionStorage.getItem('personal-info')
+  const savedState = JSON.parse(contract)
 
   const nextStep = () => {
-    const step = currentStep + 1;
-    setCurrentStep(step);
-    sessionStorage.setItem(`${username}_currentStep`, JSON.stringify(step));
-  };
+    setCurrentStep((prev) => prev + 1)
+    const step = currentStep + 1
+    sessionStorage.setItem('currentStep', JSON.stringify(step))
+  }
+
 
   const renderStep = () => {
     switch (currentStep) {
@@ -136,110 +134,205 @@ const ContractForm = ({ subHead, endDate }) => {
         return (
           <FormOne
             nextStep={nextStep}
-            savedState={savedState}
             contractType={contractType}
-            username={username}
-            userId={userId}
+            savedState={savedState}
+            contractSessionId={contractSessionId}
           />
-        );
+        )
+
       case 2:
         return (
           <FormTwo
-            nextStep={nextStep}
             contractType={contractType}
+            nextStep={nextStep}
             savedState={savedState}
-            username={username}
-            userId={userId}
+            contractSessionId={contractSessionId}
           />
-        );
+        )
+
       case 3:
         return (
           <FormThree
-            nextStep={nextStep}
             contractType={contractType}
+            nextStep={nextStep}
             savedState={savedState}
-            username={username}
-            userId={userId}
+            contractSessionId={contractSessionId}
           />
-        );
+        )
+
       case 4:
         return (
           <FormFour
             nextStep={nextStep}
             setCurrentStep={setCurrentStep}
             savedState={savedState}
-            heading="Review and Sign Contract"
-            username={username}
-            userId={userId}
+            heading='Review and Sign Contract'
+            contractSessionId={contractSessionId}
           />
-        );
+        )
+
       case 5:
         return (
           <FormFive
-            nextStep={nextStep}
             savedState={savedState}
-            username={username}
-            userId={userId}
+            nextStep={nextStep}
+            contractSessionId={contractSessionId}
           />
-        );
+        )
+
       case 6:
         return (
           <FormFour
             nextStep={nextStep}
             savedState={savedState}
             setCurrentStep={setCurrentStep}
-            heading="Review and Sign Contract"
-            signature={savedState?.signature}
-            hasSignature={Boolean(savedState?.signature)}
-            username={username}
-            userId={userId}
+            heading='Review and Sign Contract'
+            signature={savedState.signature}
+            hasSignature={Boolean(savedState.signature)}
           />
-        );
-      default:
-        return null;
+        )
     }
-  };
+  }
+
+  // const handleFormSubmit = (e) => {
+  //   if (
+  //     (currentStep === 6 && formik.values.signature) ||
+  //     (currentStep === 4 && formik.values.signature)
+  //   ) {
+  //     console.log("ee");
+  //     formik.handleSubmit(e);
+  //   } else {
+  //     e.preventDefault();
+  //     setCurrentStep((prev) => prev + 1);
+  //   }
+  // };
+
+  // const checkStepValidility = () => {
+  //   switch (currentStep) {
+  //     case 1:
+  //       if (
+  //         formik.values.clientName &&
+  //         !formik.errors.clientName &&
+  //         formik.values.companyName &&
+  //         !formik.errors.companyName &&
+  //         formik.values.country &&
+  //         !formik.errors.country &&
+  //         formik.values.email &&
+  //         !formik.errors.email &&
+  //         formik.values.state &&
+  //         !formik.errors.state
+  //       ) {
+  //         return false;
+  //       } else return true;
+  //     case 2:
+  //       if (
+  //         formik.values.startDate &&
+  //         formik.values.description &&
+  //         formik.values.scopeOfWork
+  //       ) {
+  //         return false;
+  //       } else return true;
+  //     case 3:
+  //       if (formik.values.paymentFrequency && formik.values.paymentRate) {
+  //         return false;
+  //       } else return true;
+  //     case 4:
+  //     case 5:
+  //       return false; // Allow proceeding in later steps
+  //     default:
+  //       return true;
+  //   }
+  // };
 
   return (
-    <section className="p-4 w-full flex flex-col gap-10 pt-10">
-      <div className="flex items-center gap-1 text-sm font-medium leading-normal pr-text-clr xl:gap-3" onClick={handlePrevious}>
+    <section className=' p-4 w-full flex flex-col gap-10 pt-10'>
+      <div
+        className='flex items-center gap-1 text-sm font-medium leading-normal pr-text-clr  xl:gap-3  '
+        onClick={handlePrevious}
+      >
         <FaArrowLeft size={18} />
-        <span className="cursor-pointer">Go back</span>
+
+        <span className='cursor-pointer'>Go back</span>
       </div>
 
-      <div className="flex flex-col gap-6">
-        <div className="space-y-3">
-          <h3 className="text-xl leading-normal font-bold xl:text-[29px]">Preparing a contract</h3>
-          <p className="text-[12px] font-medium leading-normal xl:w-[428px] xl:text-[16px]" style={{ color: 'rgba(0, 0, 0, 0.60)' }}>
-            Input the required details to customize your contract. Ensure all fields are complete for accuracy.
+      <div className='flex flex-col gap-6'>
+        <div className='space-y-3'>
+          <h3 className='text-xl leading-normal font-bold xl:text-[29px]'>
+            Preparing a contract
+          </h3>
+          <p
+            className='text-[12px] font-medium leading-normal xl:w-[428px] xl:text-[16px]'
+            style={{ color: 'rgba(0, 0, 0, 0.60)' }}
+          >
+            Input the required details to customize your contract. Ensure all
+            fields are complete for accuracy.
           </p>
         </div>
 
-        <div className="flex-col flex md:flex-row gap-5 md:justify-between w-full">
-          {/* Stepper */}
-          <div className="flex overview-expense-bg border-[2px] border-[#E1E2DD] mb-3 md:mb-0 rounded-2xl h-fit md:p-8 px-8 p-2 flex-shrink-0 lg:w-96 gap-4 md:flex-col md:order-2 items-center">
+        <div className='flex-col flex md:flex-row gap-5 md:justify-between w-full'>
+          <div className='flex overview-expense-bg border-[2px] border-[#E1E2DD] mb-3 md:mb-0 rounded-2xl h-fit md:p-8 px-8 p-2 flex-shrink-0  lg:w-96 gap-4 md:flex-col md:order-2  items-center'>
             {steps.map((step, i) => (
-              <div key={i} className="flex w-full items-center gap-4">
-                <p className={`w-8 h-8 md:w-10 md:h-10 flex-shrink-0 flex items-center justify-center rounded-full ${
-                  currentStep >= i + 1 ? 'bg-[#008000] text-white' : 'text-[#E1E2DD] ring-1 ring-[#E1E2DD]'
-                }`}>
+              <div key={i} className='flex w-full items-center gap-4'>
+                <p
+                  className={`w-8 h-8 md:w-10 md:h-10 flex-shrink-0 flex items-center  justify-center rounded-full ${currentStep >= i + 1
+                    ? 'bg-[#008000] text-white'
+                    : 'text-[#E1E2DD] ring-1 ring-[#E1E2DD]'
+                    }`}
+                >
                   {i + 1}
                 </p>
-                <p className="hidden md:block text-center text-sm lg:text-base truncate font-medium leading-normal">
+                <p className=' hidden md:block text-center text-sm lg:text-base truncate font-medium leading-normal '>
                   {step}
                 </p>
               </div>
+              // <div
+              //   key={i}
+              //   className={`step-item  ${currentStep === i + 1 && "active"} ${
+              //     (i + 1 < currentStep || complete) && "complete"
+              //   }`}
+              // >
+              //   <div className="step">{i + 1}</div>
+              //   <p className="text-center text-[10px] font-medium leading-normal xl:text-2xl px-4 xl:px-0">
+              //     {step}
+              //   </p>
+              // </div>
             ))}
           </div>
 
-          {/* Form Container */}
-          <div className="overview-expense-bg border-[2px] border-[#E1E2DD] p-10 w-full rounded-3xl">
-            <div>{renderStep()}</div>
+          <div className='overview-expense-bg border-[2px] border-[#E1E2DD] p-10 w-full rounded-3xl'>
+
+            <div>
+              <div>{renderStep()}</div>
+
+              <div className='lg:flex lg:justify-center'>
+                {/* {currentStep <= 3 && (
+                  <button
+                    disabled={checkStepValidility()}
+                    type="submit"
+                    className={`pr-bg-clr mt-[18px] disabled:opacity-50 disabled:cursor-not-allowed w-full rounded-lg text-white text-[0.75rem] py-[14px] lg:w-auto lg:mx-auto lg:px-[60px] xl:py-6 xl:text-xl xl:mt-[36px] 
+                    
+                    `}
+                  >
+                    Save and Continue
+                  </button>
+                )} */}
+
+                {/* {currentStep === 6 && (
+                  <button
+                    type="submit"
+                    className={`pr-bg-clr flex items-center justify-center mt-[18px] w-full rounded-lg text-white text-[0.75rem] py-[14px] lg:w-auto lg:mx-auto lg:px-[60px] xl:py-6 xl:text-xl xl:mt-[36px] 
+                    
+                    `}
+                  >
+                    Send Contract <img src={sendcontract} alt="send icon" />
+                  </button>
+                )} */}
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </section>
-  );
-};
-
-export default ContractForm;
+  )
+}
+export default ContractForm
