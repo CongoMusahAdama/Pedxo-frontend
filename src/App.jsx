@@ -165,17 +165,12 @@ const router = createBrowserRouter([
 ])
 
 function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-<<<<<<< HEAD
-      <UserProvider>
-        <RouterProvider router={router}></RouterProvider>
-      </UserProvider>
-=======
+    return (
+  <QueryClientProvider client={queryClient}>
+    <UserProvider>
       <RouterProvider router={router} />
->>>>>>> 0a6a96972c0a0cfa77c7162bb2d2aec6c9cc70ef
-    </QueryClientProvider>
-  )
-}
+    </UserProvider>
+  </QueryClientProvider>
+);
 
 export default App
